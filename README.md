@@ -1,4 +1,4 @@
-# Pomodoro
+# Still Focus
 
 Uma ferramenta de foco minimalista: full-screen background personalizável, camada ASCII atmosférica em canvas, glass UI e timer preciso baseado em timestamp.
 

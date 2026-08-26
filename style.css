@@ -36,8 +36,9 @@
   --blur-m: 28px;
   --blur-l: 46px;
 
-  --font-ui:   'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-ui:   'Onest', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --tracking-tight: -0.05em; /* -5 letter-spacing */
 
   --ease-out: cubic-bezier(.16,1,.3,1);
   --dur-fast: 150ms;
@@ -55,6 +56,7 @@ html, body{
 }
 body{
   font-family:var(--font-ui);
+  letter-spacing:var(--tracking-tight);
   color:var(--color-fg);
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
@@ -241,7 +243,7 @@ label.file-drop:focus-within{
   font-weight:600;
   font-size:clamp(72px, 20vw, 168px);
   line-height:1;
-  letter-spacing:-.02em;
+  letter-spacing:var(--tracking-tight);
   color:var(--color-fg);
   text-shadow:0 2px 40px rgba(0,0,0,.25);
   user-select:none;
@@ -292,6 +294,9 @@ label.file-drop:focus-within{
 /* ============================================================
    SETTINGS OVERLAY
    ============================================================ */
+#settings-overlay[hidden]{
+  display:none !important;
+}
 .overlay{
   position:fixed; inset:0;
   z-index:10;
