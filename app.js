@@ -6,7 +6,6 @@
 
   const STORAGE_KEY = "pomodoro:v1";
 
-  const MODE_LABELS = { focus: "Focus", short: "Short Break", long: "Long Break" };
   const MODE_HINTS = {
     focus: "um período de foco",
     short: "uma pausa curta",
@@ -20,21 +19,127 @@
   };
 
   const GRADIENT_PRESETS = [
-    { id: "aurora",  css: "radial-gradient(120% 100% at 15% 10%, #16233c 0%, transparent 55%), radial-gradient(110% 100% at 85% 20%, #241a3d 0%, transparent 55%), radial-gradient(140% 120% at 50% 100%, #0d3b3a 0%, transparent 60%), #0a0e13" },
-    { id: "ember",   css: "linear-gradient(160deg, #2b0f12 0%, #4a1a1a 45%, #1c0a0d 100%)" },
-    { id: "dusk",    css: "linear-gradient(160deg, #241338 0%, #3a2159 45%, #120a20 100%)" },
-    { id: "forest",  css: "linear-gradient(160deg, #0f2418 0%, #1c3d2a 45%, #0a1712 100%)" },
-    { id: "slate",   css: "linear-gradient(160deg, #1b2226 0%, #2c3941 45%, #10151a 100%)" },
-    { id: "citrine", css: "linear-gradient(160deg, #2e2410 0%, #4a3a16 45%, #1a1508 100%)" },
-    { id: "ocean",   css: "linear-gradient(160deg, #0c1f2e 0%, #123448 45%, #081521 100%)" },
-    { id: "mauve",   css: "linear-gradient(160deg, #241a26 0%, #3d2940 45%, #150e17 100%)" }
+    { id: "aurora",  css: "radial-gradient(120% 100% at 15% 10%, #16233c 0%, transparent 55%), radial-gradient(110% 100% at 85% 20%, #241a3d 0%, transparent 55%), radial-gradient(140% 120% at 50% 100%, #0d3b3a 0%, transparent 60%), #0a0e13", avg: { r: 20, g: 34, b: 50 } },
+    { id: "ember",   css: "linear-gradient(160deg, #2b0f12 0%, #4a1a1a 45%, #1c0a0d 100%)", avg: { r: 48, g: 17, b: 19 } },
+    { id: "dusk",    css: "linear-gradient(160deg, #241338 0%, #3a2159 45%, #120a20 100%)", avg: { r: 37, g: 21, b: 59 } },
+    { id: "forest",  css: "linear-gradient(160deg, #0f2418 0%, #1c3d2a 45%, #0a1712 100%)", avg: { r: 18, g: 40, b: 28 } },
+    { id: "slate",   css: "linear-gradient(160deg, #1b2226 0%, #2c3941 45%, #10151a 100%)", avg: { r: 29, g: 37, b: 43 } },
+    { id: "citrine", css: "linear-gradient(160deg, #2e2410 0%, #4a3a16 45%, #1a1508 100%)", avg: { r: 49, g: 38, b: 15 } },
+    { id: "ocean",   css: "linear-gradient(160deg, #0c1f2e 0%, #123448 45%, #081521 100%)", avg: { r: 13, g: 35, b: 50 } },
+    { id: "mauve",   css: "linear-gradient(160deg, #241a26 0%, #3d2940 45%, #150e17 100%)", avg: { r: 39, g: 27, b: 42 } }
   ];
+  const DEFAULT_BG_AVG = { r: 20, g: 34, b: 50 };
+
+  const MONTHS_PT = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+
+  /* ============================================================
+     ADAPTIVE CONTRAST — computes a readable foreground color
+     tinted toward the background's own hue, instead of pure
+     white or pure black. Dark backgrounds get a near-white text
+     tinted with the bg hue; light backgrounds get a near-black
+     text tinted the same way.
+     ============================================================ */
+  function hexToRgb(hex){
+    const h = hex.replace("#", "");
+    const full = h.length === 3 ? h.split("").map(c => c + c).join("") : h;
+    const int = parseInt(full, 16);
+    return { r: (int >> 16) & 255, g: (int >> 8) & 255, b: int & 255 };
+  }
+
+  function rgbToHsl({ r, g, b }){
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s; const l = (max + min) / 2;
+    if (max === min){ h = 0; s = 0; }
+    else {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max){
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        default: h = (r - g) / d + 4;
+      }
+      h /= 6;
+    }
+    return { h: h * 360, s: s * 100, l: l * 100 };
+  }
+
+  function hslToRgb({ h, s, l }){
+    h /= 360; s /= 100; l /= 100;
+    let r, g, b;
+    if (s === 0){ r = g = b = l; }
+    else {
+      const hue2rgb = (p, q, t) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1/6) return p + (q - p) * 6 * t;
+        if (t < 1/2) return q;
+        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        return p;
+      };
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      r = hue2rgb(p, q, h + 1/3);
+      g = hue2rgb(p, q, h);
+      b = hue2rgb(p, q, h - 1/3);
+    }
+    return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
+  }
+
+  function relativeLuminance({ r, g, b }){
+    const toLinear = c => {
+      const cs = c / 255;
+      return cs <= 0.03928 ? cs / 12.92 : Math.pow((cs + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+  }
+
+  function rgbCss({ r, g, b }){ return `rgb(${r}, ${g}, ${b})`; }
+
+  function updateAdaptiveForeground(avg){
+    const hsl = rgbToHsl(avg);
+    const bgIsLight = relativeLuminance(avg) > 0.5;
+    // main readable text: near-white (dark bg) or near-black (light bg), tinted with bg hue
+    const fg = hslToRgb({
+      h: hsl.h,
+      s: Math.min(hsl.s * 0.4, 26),
+      l: bgIsLight ? 12 : 94
+    });
+    // ink for text drawn on top of a filled --color-fg surface (e.g. active mode pill)
+    const ink = hslToRgb({
+      h: hsl.h,
+      s: Math.min(hsl.s * 1.15, 65),
+      l: bgIsLight ? 92 : 16
+    });
+    document.documentElement.style.setProperty("--color-fg", rgbCss(fg));
+    document.documentElement.style.setProperty("--color-fg-ink", rgbCss(ink));
+  }
+
+  function averageColorFromImage(imgEl){
+    try {
+      const c = document.createElement("canvas");
+      const size = 24;
+      c.width = size; c.height = size;
+      const ctx = c.getContext("2d", { willReadFrequently: true });
+      const iw = imgEl.naturalWidth || imgEl.width, ih = imgEl.naturalHeight || imgEl.height;
+      const scale = Math.max(size / iw, size / ih);
+      const dw = iw * scale, dh = ih * scale;
+      ctx.drawImage(imgEl, (size - dw) / 2, (size - dh) / 2, dw, dh);
+      const data = ctx.getImageData(0, 0, size, size).data;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let i = 0; i < data.length; i += 4){ r += data[i]; g += data[i+1]; b += data[i+2]; n++; }
+      return { r: Math.round(r / n), g: Math.round(g / n), b: Math.round(b / n) };
+    } catch(e){
+      return DEFAULT_BG_AVG; // tainted canvas (cross-origin) — fall back to default
+    }
+  }
 
   /* ---------- state ---------- */
   let settings = {
     durations: { ...DEFAULT_DURATIONS },
     background: { type: "default", color: "#16233c", gradientId: "aurora", image: null },
-    asciiEnabled: true
+    asciiEnabled: true,
+    taskText: ""
   };
 
   let timer = {
@@ -55,7 +160,8 @@
       settings = {
         durations: { ...DEFAULT_DURATIONS, ...(parsed.durations || {}) },
         background: { type: "default", color: "#16233c", gradientId: "aurora", image: null, ...(parsed.background || {}) },
-        asciiEnabled: parsed.asciiEnabled !== undefined ? parsed.asciiEnabled : true
+        asciiEnabled: parsed.asciiEnabled !== undefined ? parsed.asciiEnabled : true,
+        taskText: typeof parsed.taskText === "string" ? parsed.taskText : ""
       };
     } catch(e){ /* corrupted or unavailable storage — keep defaults */ }
   }
@@ -76,11 +182,13 @@
   const el = {
     bgLayer: document.getElementById("bg-layer"),
     asciiCanvas: document.getElementById("ascii-canvas"),
-    modePrimary: document.getElementById("mode-primary"),
     modePills: Array.from(document.querySelectorAll(".mode-pill")),
+    taskInput: document.getElementById("task-input"),
+    dateDisplay: document.getElementById("date-display"),
     timer: document.getElementById("timer"),
     startBtn: document.getElementById("start-btn"),
     resetBtn: document.getElementById("reset-btn"),
+    fullscreenBtn: document.getElementById("fullscreen-btn"),
     sessionHint: document.getElementById("session-hint"),
     settingsBtn: document.getElementById("settings-btn"),
     settingsOverlay: document.getElementById("settings-overlay"),
@@ -219,12 +327,9 @@
   }
 
   function renderModeUI(){
-    el.modePrimary.textContent = MODE_LABELS[timer.mode];
     el.sessionHint.textContent = MODE_HINTS[timer.mode];
     el.modePills.forEach(pill => {
-      const isActive = pill.dataset.mode === timer.mode;
-      pill.classList.toggle("active", isActive);
-      pill.hidden = isActive; // the active mode is shown big above, not duplicated below
+      pill.classList.toggle("active", pill.dataset.mode === timer.mode);
     });
   }
 
@@ -266,22 +371,28 @@
     if (bg.type === "solid"){
       el.bgLayer.style.background = bg.color;
       AsciiLayer.clearImage();
+      updateAdaptiveForeground(hexToRgb(bg.color));
     } else if (bg.type === "gradient"){
       const preset = GRADIENT_PRESETS.find(p => p.id === bg.gradientId) || GRADIENT_PRESETS[0];
       el.bgLayer.style.background = preset.css;
       AsciiLayer.clearImage();
+      updateAdaptiveForeground(preset.avg);
     } else if (bg.type === "image" && bg.image){
       el.bgLayer.classList.add("has-image");
       el.bgLayer.style.setProperty("--user-bg-image", `url(${CSS.escape ? bg.image : bg.image})`);
       el.bgLayer.style.backgroundImage = `url("${bg.image}")`;
       const img = new Image();
-      img.onload = () => AsciiLayer.setSourceImage(img);
+      img.onload = () => {
+        AsciiLayer.setSourceImage(img);
+        updateAdaptiveForeground(averageColorFromImage(img));
+      };
       img.src = bg.image;
       currentImageEl = img;
     } else {
       // default
       el.bgLayer.style.background = "";
       AsciiLayer.clearImage();
+      updateAdaptiveForeground(DEFAULT_BG_AVG);
     }
   }
 
@@ -360,6 +471,53 @@
   }
 
   /* ============================================================
+     FULLSCREEN
+     ============================================================ */
+  function isFullscreen(){ return !!document.fullscreenElement; }
+
+  function updateFullscreenIcon(){
+    const enterIcon = el.fullscreenBtn.querySelector(".icon-fs-enter");
+    const exitIcon = el.fullscreenBtn.querySelector(".icon-fs-exit");
+    const fs = isFullscreen();
+    enterIcon.hidden = fs;
+    exitIcon.hidden = !fs;
+    el.fullscreenBtn.setAttribute("aria-label", fs ? "Sair da tela cheia" : "Entrar em tela cheia");
+  }
+
+  function toggleFullscreen(){
+    if (isFullscreen()){
+      document.exitFullscreen().catch(() => {});
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  }
+
+  /* ============================================================
+     DATE BADGE
+     ============================================================ */
+  function renderDateBadge(){
+    const now = new Date();
+    const month = MONTHS_PT[now.getMonth()];
+    el.dateDisplay.textContent = `${month} ${now.getDate()} de ${now.getFullYear()}`;
+  }
+
+  /* ============================================================
+     TASK INPUT
+     ============================================================ */
+  function initTaskInput(){
+    if (settings.taskText) el.taskInput.textContent = settings.taskText;
+  }
+
+  let taskSaveTimer = null;
+  function onTaskInput(){
+    clearTimeout(taskSaveTimer);
+    taskSaveTimer = setTimeout(() => {
+      settings.taskText = el.taskInput.textContent.trim();
+      saveSettings();
+    }, 400);
+  }
+
+  /* ============================================================
      EVENTS
      ============================================================ */
   function wireEvents(){
@@ -368,6 +526,13 @@
       else startTimer();
     });
     el.resetBtn.addEventListener("click", resetTimer);
+    el.fullscreenBtn.addEventListener("click", toggleFullscreen);
+    document.addEventListener("fullscreenchange", updateFullscreenIcon);
+
+    el.taskInput.addEventListener("input", onTaskInput);
+    el.taskInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter"){ e.preventDefault(); el.taskInput.blur(); }
+    });
 
     el.modePills.forEach(pill => {
       pill.addEventListener("click", () => switchMode(pill.dataset.mode));
@@ -380,7 +545,9 @@
     });
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && !el.settingsOverlay.hidden) closeSettingsPanel();
-      if (e.code === "Space" && el.settingsOverlay.hidden && document.activeElement.tagName !== "BUTTON" && document.activeElement.tagName !== "INPUT"){
+      const active = document.activeElement;
+      const isTyping = active && (active.tagName === "BUTTON" || active.tagName === "INPUT" || active.isContentEditable);
+      if (e.code === "Space" && el.settingsOverlay.hidden && !isTyping){
         e.preventDefault();
         if (timer.running) pauseTimer(); else startTimer();
       }
@@ -445,6 +612,9 @@
     renderTimerDisplay();
     renderModeUI();
     renderControlsUI();
+    renderDateBadge();
+    initTaskInput();
+    updateFullscreenIcon();
 
     applyBackground();
     AsciiLayer.init(el.asciiCanvas);
