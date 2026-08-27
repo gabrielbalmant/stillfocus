@@ -115,6 +115,13 @@
     document.documentElement.style.setProperty("--color-fg-ink", rgbCss(ink));
   }
 
+  function updateDitherDuotone(avg){
+    const hsl = rgbToHsl(avg);
+    const dark = hslToRgb({ h: hsl.h, s: Math.min(hsl.s * 1.1, 55), l: 22 });
+    const light = hslToRgb({ h: hsl.h, s: Math.min(hsl.s * 0.35, 30), l: 92 });
+    DitherLayer.setDuotone(dark, light);
+  }
+
   function averageColorFromImage(imgEl){
     try {
       const c = document.createElement("canvas");
@@ -139,7 +146,9 @@
     durations: { ...DEFAULT_DURATIONS },
     background: { type: "default", color: "#16233c", gradientId: "aurora", image: null },
     asciiEnabled: true,
-    taskText: ""
+    taskText: "",
+    fontWeight: 800,
+    dither: { enabled: false, intensity: 40, noiseEnabled: true }
   };
 
   let timer = {
@@ -161,7 +170,9 @@
         durations: { ...DEFAULT_DURATIONS, ...(parsed.durations || {}) },
         background: { type: "default", color: "#16233c", gradientId: "aurora", image: null, ...(parsed.background || {}) },
         asciiEnabled: parsed.asciiEnabled !== undefined ? parsed.asciiEnabled : true,
-        taskText: typeof parsed.taskText === "string" ? parsed.taskText : ""
+        taskText: typeof parsed.taskText === "string" ? parsed.taskText : "",
+        fontWeight: [300, 400, 800].includes(parsed.fontWeight) ? parsed.fontWeight : 800,
+        dither: { enabled: false, intensity: 40, noiseEnabled: true, ...(parsed.dither || {}) }
       };
     } catch(e){ /* corrupted or unavailable storage — keep defaults */ }
   }
@@ -206,7 +217,14 @@
     gradientPresetsWrap: document.getElementById("gradient-presets"),
     imageInput: document.getElementById("image-input"),
     resetBgBtn: document.getElementById("reset-bg-btn"),
-    asciiToggle: document.getElementById("ascii-toggle")
+    asciiToggle: document.getElementById("ascii-toggle"),
+    weightTabs: Array.from(document.querySelectorAll(".weight-tab")),
+    ditherToggle: document.getElementById("dither-toggle"),
+    ditherIntensityField: document.getElementById("dither-intensity-field"),
+    ditherIntensity: document.getElementById("dither-intensity"),
+    ditherIntensityValue: document.getElementById("dither-intensity-value"),
+    ditherNoiseRow: document.getElementById("dither-noise-row"),
+    ditherNoiseToggle: document.getElementById("dither-noise-toggle")
   };
 
   /* ============================================================
@@ -371,12 +389,16 @@
     if (bg.type === "solid"){
       el.bgLayer.style.background = bg.color;
       AsciiLayer.clearImage();
+      DitherLayer.clearImage();
       updateAdaptiveForeground(hexToRgb(bg.color));
+      updateDitherDuotone(hexToRgb(bg.color));
     } else if (bg.type === "gradient"){
       const preset = GRADIENT_PRESETS.find(p => p.id === bg.gradientId) || GRADIENT_PRESETS[0];
       el.bgLayer.style.background = preset.css;
       AsciiLayer.clearImage();
+      DitherLayer.clearImage();
       updateAdaptiveForeground(preset.avg);
+      updateDitherDuotone(preset.avg);
     } else if (bg.type === "image" && bg.image){
       el.bgLayer.classList.add("has-image");
       el.bgLayer.style.setProperty("--user-bg-image", `url(${CSS.escape ? bg.image : bg.image})`);
@@ -384,7 +406,10 @@
       const img = new Image();
       img.onload = () => {
         AsciiLayer.setSourceImage(img);
-        updateAdaptiveForeground(averageColorFromImage(img));
+        DitherLayer.setSourceImage(img);
+        const avg = averageColorFromImage(img);
+        updateAdaptiveForeground(avg);
+        updateDitherDuotone(avg);
       };
       img.src = bg.image;
       currentImageEl = img;
@@ -392,7 +417,9 @@
       // default
       el.bgLayer.style.background = "";
       AsciiLayer.clearImage();
+      DitherLayer.clearImage();
       updateAdaptiveForeground(DEFAULT_BG_AVG);
+      updateDitherDuotone(DEFAULT_BG_AVG);
     }
   }
 
@@ -443,6 +470,8 @@
     el.durLong.value = settings.durations.long;
     el.asciiToggle.checked = settings.asciiEnabled;
     renderSettingsBackgroundUI();
+    renderWeightTabsUI();
+    renderDitherUI();
     el.closeSettings.focus();
   }
 
@@ -499,6 +528,44 @@
     const now = new Date();
     const month = MONTHS_PT[now.getMonth()];
     el.dateDisplay.textContent = `${month} ${now.getDate()} de ${now.getFullYear()}`;
+  }
+
+  /* ============================================================
+     FONT WEIGHT
+     ============================================================ */
+  function applyFontWeight(){
+    document.documentElement.style.setProperty("--weight-base", settings.fontWeight);
+  }
+
+  function renderWeightTabsUI(){
+    el.weightTabs.forEach(tab => {
+      tab.classList.toggle("active", Number(tab.dataset.weight) === settings.fontWeight);
+    });
+  }
+
+  function setFontWeight(weight){
+    settings.fontWeight = weight;
+    saveSettings();
+    applyFontWeight();
+    renderWeightTabsUI();
+  }
+
+  /* ============================================================
+     DITHER EFFECT
+     ============================================================ */
+  function renderDitherUI(){
+    el.ditherToggle.checked = settings.dither.enabled;
+    el.ditherIntensityField.hidden = !settings.dither.enabled;
+    el.ditherNoiseRow.hidden = !settings.dither.enabled;
+    el.ditherIntensity.value = settings.dither.intensity;
+    el.ditherIntensityValue.textContent = `${settings.dither.intensity}%`;
+    el.ditherNoiseToggle.checked = settings.dither.noiseEnabled;
+  }
+
+  function applyDitherFromSettings(){
+    DitherLayer.setIntensity(settings.dither.intensity);
+    DitherLayer.setNoiseEnabled(settings.dither.noiseEnabled);
+    DitherLayer.setEnabled(settings.dither.enabled);
   }
 
   /* ============================================================
@@ -596,6 +663,32 @@
       AsciiLayer.setEnabled(settings.asciiEnabled);
     });
 
+    el.weightTabs.forEach(tab => {
+      tab.addEventListener("click", () => setFontWeight(Number(tab.dataset.weight)));
+    });
+
+    el.ditherToggle.addEventListener("change", () => {
+      settings.dither.enabled = el.ditherToggle.checked;
+      saveSettings();
+      el.ditherIntensityField.hidden = !settings.dither.enabled;
+      el.ditherNoiseRow.hidden = !settings.dither.enabled;
+      DitherLayer.setEnabled(settings.dither.enabled);
+    });
+
+    el.ditherIntensity.addEventListener("input", () => {
+      const v = Number(el.ditherIntensity.value);
+      settings.dither.intensity = v;
+      el.ditherIntensityValue.textContent = `${v}%`;
+      DitherLayer.setIntensity(v);
+    });
+    el.ditherIntensity.addEventListener("change", saveSettings);
+
+    el.ditherNoiseToggle.addEventListener("change", () => {
+      settings.dither.noiseEnabled = el.ditherNoiseToggle.checked;
+      saveSettings();
+      DitherLayer.setNoiseEnabled(settings.dither.noiseEnabled);
+    });
+
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("focus", onVisibilityChange);
   }
@@ -615,10 +708,14 @@
     renderDateBadge();
     initTaskInput();
     updateFullscreenIcon();
+    applyFontWeight();
 
     applyBackground();
     AsciiLayer.init(el.asciiCanvas);
     AsciiLayer.setEnabled(settings.asciiEnabled);
+
+    DitherLayer.init(document.getElementById("dither-canvas"));
+    applyDitherFromSettings();
   }
 
   if (document.readyState === "loading"){

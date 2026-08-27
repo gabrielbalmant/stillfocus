@@ -16,7 +16,10 @@
   <!-- Layer 1: full-screen background -->
   <div id="bg-layer" aria-hidden="true"></div>
 
-  <!-- Layer 2: ASCII atmospheric overlay -->
+  <!-- Layer 2: ordered-dithering stylization -->
+  <canvas id="dither-canvas" aria-hidden="true"></canvas>
+
+  <!-- Layer 3: ASCII atmospheric overlay -->
   <canvas id="ascii-canvas" aria-hidden="true"></canvas>
 
   <!-- Layer 3: application UI -->
@@ -124,11 +127,48 @@
           </div>
 
           <button id="reset-bg-btn" class="text-btn" type="button">Restaurar background padrão</button>
+        </section>
+
+        <section class="settings-section">
+          <h3>Tipografia</h3>
+          <div class="bg-type-tabs" role="tablist" aria-label="Peso da fonte">
+            <button class="weight-tab" type="button" data-weight="300" role="tab">Light</button>
+            <button class="weight-tab" type="button" data-weight="400" role="tab">Regular</button>
+            <button class="weight-tab" type="button" data-weight="800" role="tab">Extrabold</button>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h3>Efeitos</h3>
 
           <div class="ascii-toggle-row">
             <span>Camada ASCII</span>
             <label class="switch">
               <input type="checkbox" id="ascii-toggle" checked>
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="ascii-toggle-row">
+            <span>Ordered Dithering</span>
+            <label class="switch">
+              <input type="checkbox" id="dither-toggle">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="slider-field" id="dither-intensity-field" hidden>
+            <div class="slider-label-row">
+              <span>Quantidade</span>
+              <span id="dither-intensity-value" class="slider-value">40%</span>
+            </div>
+            <input type="range" id="dither-intensity" min="0" max="100" value="40">
+          </div>
+
+          <div class="ascii-toggle-row" id="dither-noise-row" hidden>
+            <span>Ruído monocromático</span>
+            <label class="switch">
+              <input type="checkbox" id="dither-noise-toggle" checked>
               <span class="switch-track"><span class="switch-thumb"></span></span>
             </label>
           </div>
@@ -139,6 +179,7 @@
   </div>
 
   <script src="ascii.js"></script>
+  <script src="dither.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
