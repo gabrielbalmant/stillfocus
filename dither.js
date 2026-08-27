@@ -21,6 +21,7 @@ const DitherLayer = (() => {
   let canvas, ctx;
   let enabled = false;
   let noiseEnabled = true;
+  let colorMode = false; // false = flat duotone, true = dither on top of the image's real colors
   let intensity = 40; // 0-100 -> maps to dot cell size
   let sourceImage = null;
 
@@ -77,7 +78,7 @@ const DitherLayer = (() => {
     return top + (bot - top) * sy;
   }
 
-  function buildLuminanceGrid(){
+  function buildSampleData(){
     if (sourceImage){
       try {
         const iw = sourceImage.naturalWidth || sourceImage.width;
@@ -89,22 +90,25 @@ const DitherLayer = (() => {
         const dw = iw * scale, dh = ih * scale;
         tctx.drawImage(sourceImage, (cols - dw) / 2, (rows - dh) / 2, dw, dh);
         const data = tctx.getImageData(0, 0, cols, rows).data;
-        const grid = new Float32Array(cols * rows);
+        const luminance = new Float32Array(cols * rows);
+        const colors = colorMode ? new Uint8ClampedArray(cols * rows * 3) : null;
         for (let i = 0, p = 0; i < data.length; i += 4, p++){
-          grid[p] = (0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2]) / 255;
+          const r = data[i], g = data[i+1], b = data[i+2];
+          luminance[p] = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+          if (colors){ colors[p*3] = r; colors[p*3+1] = g; colors[p*3+2] = b; }
         }
-        return grid;
+        return { luminance, colors };
       } catch(e){ /* tainted canvas — fall through to procedural */ }
     }
     proceduralLuminance._grid = null;
     const gw = Math.ceil(cols / 5) + 2, gh = Math.ceil(rows / 5) + 2;
-    const grid = new Float32Array(cols * rows);
+    const luminance = new Float32Array(cols * rows);
     for (let y = 0; y < rows; y++){
       for (let x = 0; x < cols; x++){
-        grid[y * cols + x] = proceduralLuminance(x, y, gw, gh);
+        luminance[y * cols + x] = proceduralLuminance(x, y, gw, gh);
       }
     }
-    return grid;
+    return { luminance, colors: null };
   }
 
   function renderPattern(){
@@ -114,16 +118,34 @@ const DitherLayer = (() => {
     }
     patternCanvas.width = cols;
     patternCanvas.height = rows;
-    const luminance = buildLuminanceGrid();
+    const { luminance, colors } = buildSampleData();
+    const useColor = colorMode && colors;
+    const amt = 0.28; // how strongly each dot is pushed toward light/dark in color mode
     const img = patternCtx.createImageData(cols, rows);
     for (let y = 0; y < rows; y++){
       const bayerRow = BAYER_4[y % 4];
       for (let x = 0; x < cols; x++){
         const threshold = (bayerRow[x % 4] + 0.5) / 16;
-        const l = luminance[y * cols + x];
-        const c = l > threshold ? lightColor : darkColor;
-        const p = (y * cols + x) * 4;
-        img.data[p] = c.r; img.data[p+1] = c.g; img.data[p+2] = c.b; img.data[p+3] = 255;
+        const idx = y * cols + x;
+        const l = luminance[idx];
+        const lighten = l > threshold;
+        const p = idx * 4;
+        if (useColor){
+          const cr = colors[idx*3], cg = colors[idx*3+1], cb = colors[idx*3+2];
+          if (lighten){
+            img.data[p]   = cr + (255 - cr) * amt;
+            img.data[p+1] = cg + (255 - cg) * amt;
+            img.data[p+2] = cb + (255 - cb) * amt;
+          } else {
+            img.data[p]   = cr * (1 - amt);
+            img.data[p+1] = cg * (1 - amt);
+            img.data[p+2] = cb * (1 - amt);
+          }
+        } else {
+          const c = lighten ? lightColor : darkColor;
+          img.data[p] = c.r; img.data[p+1] = c.g; img.data[p+2] = c.b;
+        }
+        img.data[p+3] = 255;
       }
     }
     patternCtx.putImageData(img, 0, 0);
@@ -212,6 +234,11 @@ const DitherLayer = (() => {
     setNoiseEnabled(v){
       noiseEnabled = v;
       scheduleNoiseRefresh();
+    },
+    setColorMode(v){
+      colorMode = v;
+      dirty = true;
+      if (enabled) draw();
     },
     setSourceImage(imgEl){
       sourceImage = imgEl;

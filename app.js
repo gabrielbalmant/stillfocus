@@ -122,10 +122,32 @@
     DitherLayer.setDuotone(dark, light);
   }
 
-  function averageColorFromImage(imgEl){
+  /* ---------- adaptive accent color for the Start button, derived from the wallpaper ---------- */
+  function updateAccentColor(hue, sat){
+    const s = Math.min(Math.max(sat * 1.15, 50), 85); // ensure the accent stays vivid even from a muted average
+    const primary = hslToRgb({ h: hue, s, l: 62 });
+    const strong = hslToRgb({ h: hue, s, l: 72 });
+    const primaryIsLight = relativeLuminance(primary) > 0.45;
+    const ink = primaryIsLight
+      ? hslToRgb({ h: hue, s: Math.min(s + 10, 90), l: 14 })
+      : hslToRgb({ h: hue, s: Math.max(s - 20, 15), l: 94 });
+    document.documentElement.style.setProperty("--color-primary", rgbCss(primary));
+    document.documentElement.style.setProperty("--color-primary-strong", rgbCss(strong));
+    document.documentElement.style.setProperty("--color-primary-ink", rgbCss(ink));
+  }
+
+  function updateAccentFromAvg(avg){
+    const hsl = rgbToHsl(avg);
+    updateAccentColor(hsl.h, hsl.s);
+  }
+
+  /* ---------- one canvas read: average color (contrast/duotone) + the most vivid
+     hue found in the image (accent color), so the Start button always stands out
+     against whatever wallpaper is chosen ---------- */
+  function analyzeImageColors(imgEl){
     try {
       const c = document.createElement("canvas");
-      const size = 24;
+      const size = 32;
       c.width = size; c.height = size;
       const ctx = c.getContext("2d", { willReadFrequently: true });
       const iw = imgEl.naturalWidth || imgEl.width, ih = imgEl.naturalHeight || imgEl.height;
@@ -134,10 +156,21 @@
       ctx.drawImage(imgEl, (size - dw) / 2, (size - dh) / 2, dw, dh);
       const data = ctx.getImageData(0, 0, size, size).data;
       let r = 0, g = 0, b = 0, n = 0;
-      for (let i = 0; i < data.length; i += 4){ r += data[i]; g += data[i+1]; b += data[i+2]; n++; }
-      return { r: Math.round(r / n), g: Math.round(g / n), b: Math.round(b / n) };
+      let bestScore = -1, bestHue = 0, bestSat = 0;
+      for (let i = 0; i < data.length; i += 4){
+        const pr = data[i], pg = data[i+1], pb = data[i+2];
+        r += pr; g += pg; b += pb; n++;
+        const hsl = rgbToHsl({ r: pr, g: pg, b: pb });
+        // prefer saturated pixels that aren't near-black or near-white
+        const lPenalty = 1 - Math.abs(hsl.l - 50) / 50;
+        const score = (hsl.s / 100) * (0.35 + 0.65 * lPenalty);
+        if (score > bestScore){ bestScore = score; bestHue = hsl.h; bestSat = hsl.s; }
+      }
+      const avg = { r: Math.round(r / n), g: Math.round(g / n), b: Math.round(b / n) };
+      return { avg, vividHue: bestHue, vividSat: bestSat };
     } catch(e){
-      return DEFAULT_BG_AVG; // tainted canvas (cross-origin) — fall back to default
+      const hsl = rgbToHsl(DEFAULT_BG_AVG);
+      return { avg: DEFAULT_BG_AVG, vividHue: hsl.h, vividSat: hsl.s }; // tainted canvas (cross-origin) fallback
     }
   }
 
@@ -148,7 +181,7 @@
     asciiEnabled: true,
     taskText: "",
     fontWeight: 800,
-    dither: { enabled: false, intensity: 40, noiseEnabled: true }
+    dither: { enabled: false, intensity: 40, noiseEnabled: true, colorMode: false }
   };
 
   let timer = {
@@ -172,7 +205,7 @@
         asciiEnabled: parsed.asciiEnabled !== undefined ? parsed.asciiEnabled : true,
         taskText: typeof parsed.taskText === "string" ? parsed.taskText : "",
         fontWeight: [300, 400, 800].includes(parsed.fontWeight) ? parsed.fontWeight : 800,
-        dither: { enabled: false, intensity: 40, noiseEnabled: true, ...(parsed.dither || {}) }
+        dither: { enabled: false, intensity: 40, noiseEnabled: true, colorMode: false, ...(parsed.dither || {}) }
       };
     } catch(e){ /* corrupted or unavailable storage — keep defaults */ }
   }
@@ -224,7 +257,9 @@
     ditherIntensity: document.getElementById("dither-intensity"),
     ditherIntensityValue: document.getElementById("dither-intensity-value"),
     ditherNoiseRow: document.getElementById("dither-noise-row"),
-    ditherNoiseToggle: document.getElementById("dither-noise-toggle")
+    ditherNoiseToggle: document.getElementById("dither-noise-toggle"),
+    ditherColorRow: document.getElementById("dither-color-row"),
+    ditherColorToggle: document.getElementById("dither-color-toggle")
   };
 
   /* ============================================================
@@ -390,8 +425,10 @@
       el.bgLayer.style.background = bg.color;
       AsciiLayer.clearImage();
       DitherLayer.clearImage();
-      updateAdaptiveForeground(hexToRgb(bg.color));
-      updateDitherDuotone(hexToRgb(bg.color));
+      const rgb = hexToRgb(bg.color);
+      updateAdaptiveForeground(rgb);
+      updateDitherDuotone(rgb);
+      updateAccentFromAvg(rgb);
     } else if (bg.type === "gradient"){
       const preset = GRADIENT_PRESETS.find(p => p.id === bg.gradientId) || GRADIENT_PRESETS[0];
       el.bgLayer.style.background = preset.css;
@@ -399,6 +436,7 @@
       DitherLayer.clearImage();
       updateAdaptiveForeground(preset.avg);
       updateDitherDuotone(preset.avg);
+      updateAccentFromAvg(preset.avg);
     } else if (bg.type === "image" && bg.image){
       el.bgLayer.classList.add("has-image");
       el.bgLayer.style.setProperty("--user-bg-image", `url(${CSS.escape ? bg.image : bg.image})`);
@@ -407,9 +445,10 @@
       img.onload = () => {
         AsciiLayer.setSourceImage(img);
         DitherLayer.setSourceImage(img);
-        const avg = averageColorFromImage(img);
+        const { avg, vividHue, vividSat } = analyzeImageColors(img);
         updateAdaptiveForeground(avg);
         updateDitherDuotone(avg);
+        updateAccentColor(vividHue, vividSat);
       };
       img.src = bg.image;
       currentImageEl = img;
@@ -420,6 +459,7 @@
       DitherLayer.clearImage();
       updateAdaptiveForeground(DEFAULT_BG_AVG);
       updateDitherDuotone(DEFAULT_BG_AVG);
+      updateAccentFromAvg(DEFAULT_BG_AVG);
     }
   }
 
@@ -557,14 +597,17 @@
     el.ditherToggle.checked = settings.dither.enabled;
     el.ditherIntensityField.hidden = !settings.dither.enabled;
     el.ditherNoiseRow.hidden = !settings.dither.enabled;
+    el.ditherColorRow.hidden = !settings.dither.enabled;
     el.ditherIntensity.value = settings.dither.intensity;
     el.ditherIntensityValue.textContent = `${settings.dither.intensity}%`;
     el.ditherNoiseToggle.checked = settings.dither.noiseEnabled;
+    el.ditherColorToggle.checked = settings.dither.colorMode;
   }
 
   function applyDitherFromSettings(){
     DitherLayer.setIntensity(settings.dither.intensity);
     DitherLayer.setNoiseEnabled(settings.dither.noiseEnabled);
+    DitherLayer.setColorMode(settings.dither.colorMode);
     DitherLayer.setEnabled(settings.dither.enabled);
   }
 
@@ -672,6 +715,7 @@
       saveSettings();
       el.ditherIntensityField.hidden = !settings.dither.enabled;
       el.ditherNoiseRow.hidden = !settings.dither.enabled;
+      el.ditherColorRow.hidden = !settings.dither.enabled;
       DitherLayer.setEnabled(settings.dither.enabled);
     });
 
@@ -687,6 +731,12 @@
       settings.dither.noiseEnabled = el.ditherNoiseToggle.checked;
       saveSettings();
       DitherLayer.setNoiseEnabled(settings.dither.noiseEnabled);
+    });
+
+    el.ditherColorToggle.addEventListener("change", () => {
+      settings.dither.colorMode = el.ditherColorToggle.checked;
+      saveSettings();
+      DitherLayer.setColorMode(settings.dither.colorMode);
     });
 
     document.addEventListener("visibilitychange", onVisibilityChange);
