@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#0a0e13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -27,41 +27,48 @@
 
     <header class="app-header">
       <span class="brand">Stillfocus</span>
-      <button id="settings-btn" class="icon-btn" type="button" aria-haspopup="dialog" aria-controls="settings-overlay" aria-label="Abrir configurações">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      </button>
+      <div class="header-actions">
+        <button id="gallery-btn" class="icon-btn" type="button" aria-haspopup="dialog" aria-controls="gallery-overlay" data-i18n-aria="galleryAria" aria-label="Abrir galeria de wallpapers">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="14" rx="3"/><path d="M7 21h11a3 3 0 0 0 3-3V7"/><circle cx="8" cy="8" r="1.5"/><path d="M3 14l3.5-3.5a1.5 1.5 0 0 1 2.1 0L13 15"/></svg>
+        </button>
+        <button id="settings-btn" class="icon-btn" type="button" aria-haspopup="dialog" aria-controls="settings-overlay" data-i18n-aria="settingsAria" aria-label="Abrir configurações">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
     </header>
 
     <main class="stage">
 
       <div class="task-row">
-        <div class="task-input" id="task-input" contenteditable="true" role="textbox" aria-multiline="false" aria-label="O que você quer focar" data-placeholder="What you want to focus on..."></div>
+        <div class="task-input" id="task-input" contenteditable="true" role="textbox" aria-multiline="false" data-i18n-aria="taskAria" aria-label="O que você quer focar" data-i18n-placeholder="taskPlaceholder" data-placeholder="What you want to focus on..."></div>
       </div>
 
+      <div class="pomodoro-dots" id="pomodoro-dots" hidden aria-hidden="true"></div>
+
       <div class="mode-row" role="group" aria-label="Modo do Pomodoro">
-        <button class="mode-pill" type="button" data-mode="focus">Focus</button>
-        <button class="mode-pill" type="button" data-mode="short">Short Break</button>
-        <button class="mode-pill" type="button" data-mode="long">Long Break</button>
+        <button class="mode-pill" type="button" data-mode="focus" data-i18n="modeFocus">Focus</button>
+        <button class="mode-pill" type="button" data-mode="short" data-i18n="modeShort">Short Break</button>
+        <button class="mode-pill" type="button" data-mode="long" data-i18n="modeLong">Long Break</button>
       </div>
 
       <div class="timer" id="timer" role="timer" aria-live="off">25:00</div>
 
-      <div class="controls">
+      <div class="controls" id="controls-row">
         <button id="start-btn" class="btn-primary" type="button">
           <svg class="icon-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
           <svg class="icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" hidden><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
-          <span class="btn-label">Start</span>
+          <span class="btn-label" id="start-btn-label" data-i18n="startLabel">Start</span>
         </button>
-        <button id="reset-btn" class="icon-btn ghost" type="button" aria-label="Reiniciar timer">
+        <button id="reset-btn" class="icon-btn ghost" type="button" data-i18n-aria="resetAria" aria-label="Reiniciar timer">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
         </button>
-        <button id="fullscreen-btn" class="icon-btn ghost" type="button" aria-label="Entrar em tela cheia">
+        <button id="fullscreen-btn" class="icon-btn ghost" type="button" data-i18n-aria="fullscreenEnterAria" aria-label="Entrar em tela cheia">
           <svg class="icon-fs-enter" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
           <svg class="icon-fs-exit" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" hidden><path d="M8 3v3a2 2 0 0 1-2 2H3M16 3v3a2 2 0 0 0 2 2h3M21 16h-3a2 2 0 0 0-2 2v3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
         </button>
       </div>
 
-      <p class="session-hint" id="session-hint">um período de foco</p>
+      <p class="session-hint" id="session-hint" data-i18n="hintFocus">um período de foco</p>
 
     </main>
 
@@ -71,12 +78,28 @@
 
   </div>
 
+  <!-- Gallery dialog -->
+  <div id="gallery-overlay" class="overlay" hidden>
+    <div class="settings-panel glass" role="dialog" aria-modal="true" aria-labelledby="gallery-title">
+      <div class="settings-header">
+        <h2 id="gallery-title" data-i18n="galleryTitle">Galeria</h2>
+        <button id="close-gallery" class="icon-btn" type="button" data-i18n-aria="closeGalleryAria" aria-label="Fechar galeria">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="settings-scroll">
+        <p class="gallery-hint" data-i18n="galleryHint">Wallpapers originais, já incluídos no projeto. Toque para aplicar.</p>
+        <div class="gallery-grid" id="gallery-grid"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Settings dialog -->
   <div id="settings-overlay" class="overlay" hidden>
     <div class="settings-panel glass" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <div class="settings-header">
-        <h2 id="settings-title">Configurações</h2>
-        <button id="close-settings" class="icon-btn" type="button" aria-label="Fechar configurações">
+        <h2 id="settings-title" data-i18n="settingsTitle">Configurações</h2>
+        <button id="close-settings" class="icon-btn" type="button" data-i18n-aria="closeSettingsAria" aria-label="Fechar configurações">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
@@ -84,34 +107,44 @@
       <div class="settings-scroll">
 
         <section class="settings-section">
-          <h3>Durações</h3>
+          <h3 data-i18n="sectionFormat">Formato</h3>
+          <div class="bg-type-tabs" role="tablist" aria-label="Formato do cronômetro">
+            <button class="format-tab" type="button" data-format="cronometro" role="tab" data-i18n="formatCronometro">Cronômetro</button>
+            <button class="format-tab" type="button" data-format="pomodoro" role="tab" data-i18n="formatPomodoro">Pomodoro</button>
+            <button class="format-tab" type="button" data-format="relogio" role="tab" data-i18n="formatRelogio">Relógio</button>
+            <button class="format-tab" type="button" data-format="contador" role="tab" data-i18n="formatContador">Contador</button>
+          </div>
+        </section>
+
+        <section class="settings-section" id="durations-section">
+          <h3 data-i18n="sectionDurations">Durações</h3>
           <div class="duration-grid">
             <label class="duration-field">
-              <span>Focus</span>
-              <div class="num-input"><input type="number" id="dur-focus" min="1" max="180" inputmode="numeric"><span class="unit">min</span></div>
+              <span data-i18n="modeFocus">Focus</span>
+              <div class="num-input"><input type="number" id="dur-focus" min="1" max="180" inputmode="numeric"><span class="unit" data-i18n="unitMin">min</span></div>
             </label>
             <label class="duration-field">
-              <span>Short Break</span>
-              <div class="num-input"><input type="number" id="dur-short" min="1" max="60" inputmode="numeric"><span class="unit">min</span></div>
+              <span data-i18n="modeShort">Short Break</span>
+              <div class="num-input"><input type="number" id="dur-short" min="1" max="60" inputmode="numeric"><span class="unit" data-i18n="unitMin">min</span></div>
             </label>
             <label class="duration-field">
-              <span>Long Break</span>
-              <div class="num-input"><input type="number" id="dur-long" min="1" max="90" inputmode="numeric"><span class="unit">min</span></div>
+              <span data-i18n="modeLong">Long Break</span>
+              <div class="num-input"><input type="number" id="dur-long" min="1" max="90" inputmode="numeric"><span class="unit" data-i18n="unitMin">min</span></div>
             </label>
           </div>
         </section>
 
         <section class="settings-section">
-          <h3>Ambiente</h3>
+          <h3 data-i18n="sectionEnvironment">Ambiente</h3>
           <div class="bg-type-tabs" role="tablist" aria-label="Tipo de background">
-            <button class="bg-tab" type="button" data-bgtype="default" role="tab">Padrão</button>
-            <button class="bg-tab" type="button" data-bgtype="solid" role="tab">Cor</button>
-            <button class="bg-tab" type="button" data-bgtype="gradient" role="tab">Gradiente</button>
-            <button class="bg-tab" type="button" data-bgtype="image" role="tab">Imagem</button>
+            <button class="bg-tab" type="button" data-bgtype="default" role="tab" data-i18n="tabDefault">Padrão</button>
+            <button class="bg-tab" type="button" data-bgtype="solid" role="tab" data-i18n="tabSolid">Cor</button>
+            <button class="bg-tab" type="button" data-bgtype="gradient" role="tab" data-i18n="tabGradient">Gradiente</button>
+            <button class="bg-tab" type="button" data-bgtype="image" role="tab" data-i18n="tabImage">Imagem</button>
           </div>
 
           <div id="bg-panel-solid" class="bg-panel" hidden>
-            <input type="color" id="solid-color-input" value="#16233c" aria-label="Escolher cor sólida">
+            <input type="color" id="solid-color-input" value="#16233c" data-i18n-aria="solidColorAria" aria-label="Escolher cor sólida">
           </div>
 
           <div id="bg-panel-gradient" class="bg-panel" hidden>
@@ -121,28 +154,28 @@
           <div id="bg-panel-image" class="bg-panel" hidden>
             <label class="file-drop" for="image-input">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 5 17 10"/><line x1="12" y1="5" x2="12" y2="15"/></svg>
-              <span>Escolher imagem</span>
+              <span data-i18n="chooseImage">Escolher imagem</span>
             </label>
             <input type="file" id="image-input" accept="image/*" hidden>
           </div>
 
-          <button id="reset-bg-btn" class="text-btn" type="button">Restaurar background padrão</button>
+          <button id="reset-bg-btn" class="text-btn" type="button" data-i18n="resetBg">Restaurar background padrão</button>
         </section>
 
         <section class="settings-section">
-          <h3>Tipografia</h3>
+          <h3 data-i18n="sectionTypography">Tipografia</h3>
           <div class="bg-type-tabs" role="tablist" aria-label="Peso da fonte">
-            <button class="weight-tab" type="button" data-weight="300" role="tab">Light</button>
-            <button class="weight-tab" type="button" data-weight="400" role="tab">Regular</button>
-            <button class="weight-tab" type="button" data-weight="800" role="tab">Extrabold</button>
+            <button class="weight-tab" type="button" data-weight="300" role="tab" data-i18n="weightLight">Light</button>
+            <button class="weight-tab" type="button" data-weight="400" role="tab" data-i18n="weightRegular">Regular</button>
+            <button class="weight-tab" type="button" data-weight="800" role="tab" data-i18n="weightExtrabold">Extrabold</button>
           </div>
         </section>
 
         <section class="settings-section">
-          <h3>Efeitos</h3>
+          <h3 data-i18n="sectionEffects">Efeitos</h3>
 
           <div class="ascii-toggle-row">
-            <span>Camada ASCII</span>
+            <span data-i18n="labelAsciiLayer">Camada ASCII</span>
             <label class="switch">
               <input type="checkbox" id="ascii-toggle" checked>
               <span class="switch-track"><span class="switch-thumb"></span></span>
@@ -150,7 +183,7 @@
           </div>
 
           <div class="ascii-toggle-row">
-            <span>Ordered Dithering</span>
+            <span data-i18n="labelDither">Ordered Dithering</span>
             <label class="switch">
               <input type="checkbox" id="dither-toggle">
               <span class="switch-track"><span class="switch-thumb"></span></span>
@@ -159,14 +192,14 @@
 
           <div class="slider-field" id="dither-intensity-field" hidden>
             <div class="slider-label-row">
-              <span>Quantidade</span>
+              <span data-i18n="labelDitherIntensity">Quantidade</span>
               <span id="dither-intensity-value" class="slider-value">40%</span>
             </div>
             <input type="range" id="dither-intensity" min="0" max="100" value="40">
           </div>
 
           <div class="ascii-toggle-row" id="dither-noise-row" hidden>
-            <span>Ruído monocromático</span>
+            <span data-i18n="labelDitherNoise">Ruído monocromático</span>
             <label class="switch">
               <input type="checkbox" id="dither-noise-toggle" checked>
               <span class="switch-track"><span class="switch-thumb"></span></span>
@@ -174,11 +207,47 @@
           </div>
 
           <div class="ascii-toggle-row" id="dither-color-row" hidden>
-            <span>Manter cores originais</span>
+            <span data-i18n="labelDitherColor">Manter cores originais</span>
             <label class="switch">
               <input type="checkbox" id="dither-color-toggle">
               <span class="switch-track"><span class="switch-thumb"></span></span>
             </label>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h3 data-i18n="sectionAudio">Áudio</h3>
+
+          <div class="ascii-toggle-row">
+            <span data-i18n="labelSoundPlayPause">Som de início/pausa</span>
+            <label class="switch">
+              <input type="checkbox" id="sound-playpause-toggle" checked>
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="ascii-toggle-row">
+            <span data-i18n="labelSoundTick">Tique-taque</span>
+            <label class="switch">
+              <input type="checkbox" id="sound-tick-toggle">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="ascii-toggle-row">
+            <span data-i18n="labelSoundCompletion">Som de conclusão</span>
+            <label class="switch">
+              <input type="checkbox" id="sound-completion-toggle" checked>
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h3 data-i18n="sectionLanguage">Idioma</h3>
+          <div class="bg-type-tabs" role="tablist" aria-label="Idioma">
+            <button class="lang-tab" type="button" data-lang="pt" role="tab">Português</button>
+            <button class="lang-tab" type="button" data-lang="en" role="tab">English</button>
           </div>
         </section>
 
@@ -188,6 +257,7 @@
 
   <script src="ascii.js"></script>
   <script src="dither.js"></script>
+  <script src="i18n.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

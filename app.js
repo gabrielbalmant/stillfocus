@@ -6,17 +6,23 @@
 
   const STORAGE_KEY = "pomodoro:v1";
 
-  const MODE_HINTS = {
-    focus: "um período de foco",
-    short: "uma pausa curta",
-    long: "uma pausa longa"
-  };
   const DEFAULT_DURATIONS = { focus: 25, short: 5, long: 15 }; // minutes
   const LIMITS = {
     focus: { min: 1, max: 180 },
     short: { min: 1, max: 60 },
     long:  { min: 1, max: 90 }
   };
+
+  const WALLPAPERS = [
+    { id: "aurora",  label: "Aurora" },
+    { id: "ember",   label: "Ember" },
+    { id: "dusk",    label: "Dusk" },
+    { id: "forest",  label: "Forest" },
+    { id: "ocean",   label: "Ocean" },
+    { id: "citrine", label: "Citrine" },
+    { id: "mauve",   label: "Mauve" },
+    { id: "slate",   label: "Slate" }
+  ];
 
   const GRADIENT_PRESETS = [
     { id: "aurora",  css: "radial-gradient(120% 100% at 15% 10%, #16233c 0%, transparent 55%), radial-gradient(110% 100% at 85% 20%, #241a3d 0%, transparent 55%), radial-gradient(140% 120% at 50% 100%, #0d3b3a 0%, transparent 60%), #0a0e13", avg: { r: 20, g: 34, b: 50 } },
@@ -29,8 +35,6 @@
     { id: "mauve",   css: "linear-gradient(160deg, #241a26 0%, #3d2940 45%, #150e17 100%)", avg: { r: 39, g: 27, b: 42 } }
   ];
   const DEFAULT_BG_AVG = { r: 20, g: 34, b: 50 };
-
-  const MONTHS_PT = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
 
   /* ============================================================
      ADAPTIVE CONTRAST — computes a readable foreground color
@@ -177,11 +181,14 @@
   /* ---------- state ---------- */
   let settings = {
     durations: { ...DEFAULT_DURATIONS },
-    background: { type: "default", color: "#16233c", gradientId: "aurora", image: null },
+    background: { type: "default", color: "#16233c", gradientId: "aurora", wallpaperId: null, image: null },
     asciiEnabled: true,
     taskText: "",
     fontWeight: 800,
-    dither: { enabled: false, intensity: 40, noiseEnabled: true, colorMode: false }
+    dither: { enabled: false, intensity: 40, noiseEnabled: true, colorMode: false },
+    sound: { playPause: true, tick: false, completion: true },
+    locale: "pt",
+    timerFormat: "cronometro"
   };
 
   let timer = {
@@ -190,8 +197,18 @@
     paused: false,
     endTime: null,     // timestamp ms, when running
     remaining: DEFAULT_DURATIONS.focus * 60, // seconds
+    intervalId: null,
+    pomodoroCount: 0   // completed focus sessions in the current pomodoro-format cycle (resets every 4)
+  };
+
+  let stopwatch = {
+    running: false,
+    startTs: null,
+    accumulated: 0, // seconds banked from previous run segments
     intervalId: null
   };
+
+  let clockIntervalId = null;
 
   /* ---------- persistence ---------- */
   function loadSettings(){
@@ -201,11 +218,14 @@
       const parsed = JSON.parse(raw);
       settings = {
         durations: { ...DEFAULT_DURATIONS, ...(parsed.durations || {}) },
-        background: { type: "default", color: "#16233c", gradientId: "aurora", image: null, ...(parsed.background || {}) },
+        background: { type: "default", color: "#16233c", gradientId: "aurora", wallpaperId: null, image: null, ...(parsed.background || {}) },
         asciiEnabled: parsed.asciiEnabled !== undefined ? parsed.asciiEnabled : true,
         taskText: typeof parsed.taskText === "string" ? parsed.taskText : "",
         fontWeight: [300, 400, 800].includes(parsed.fontWeight) ? parsed.fontWeight : 800,
-        dither: { enabled: false, intensity: 40, noiseEnabled: true, colorMode: false, ...(parsed.dither || {}) }
+        dither: { enabled: false, intensity: 40, noiseEnabled: true, colorMode: false, ...(parsed.dither || {}) },
+        sound: { playPause: true, tick: false, completion: true, ...(parsed.sound || {}) },
+        locale: parsed.locale === "en" ? "en" : "pt",
+        timerFormat: ["cronometro","pomodoro","relogio","contador"].includes(parsed.timerFormat) ? parsed.timerFormat : "cronometro"
       };
     } catch(e){ /* corrupted or unavailable storage — keep defaults */ }
   }
@@ -227,6 +247,7 @@
     bgLayer: document.getElementById("bg-layer"),
     asciiCanvas: document.getElementById("ascii-canvas"),
     modePills: Array.from(document.querySelectorAll(".mode-pill")),
+    modeRow: document.querySelector(".mode-row"),
     taskInput: document.getElementById("task-input"),
     dateDisplay: document.getElementById("date-display"),
     timer: document.getElementById("timer"),
@@ -259,7 +280,19 @@
     ditherNoiseRow: document.getElementById("dither-noise-row"),
     ditherNoiseToggle: document.getElementById("dither-noise-toggle"),
     ditherColorRow: document.getElementById("dither-color-row"),
-    ditherColorToggle: document.getElementById("dither-color-toggle")
+    ditherColorToggle: document.getElementById("dither-color-toggle"),
+    galleryBtn: document.getElementById("gallery-btn"),
+    galleryOverlay: document.getElementById("gallery-overlay"),
+    closeGallery: document.getElementById("close-gallery"),
+    galleryGrid: document.getElementById("gallery-grid"),
+    formatTabs: Array.from(document.querySelectorAll(".format-tab")),
+    durationsSection: document.getElementById("durations-section"),
+    pomodoroDots: document.getElementById("pomodoro-dots"),
+    controlsRow: document.getElementById("controls-row"),
+    soundPlayPauseToggle: document.getElementById("sound-playpause-toggle"),
+    soundTickToggle: document.getElementById("sound-tick-toggle"),
+    soundCompletionToggle: document.getElementById("sound-completion-toggle"),
+    langTabs: Array.from(document.querySelectorAll(".lang-tab"))
   };
 
   /* ============================================================
@@ -282,9 +315,12 @@
     renderControlsUI();
   }
 
+  let lastTickWhole = null;
   function tickTimer(){
     if (!timer.running) return;
     const remaining = Math.max(0, Math.round((timer.endTime - Date.now()) / 1000));
+    if (settings.sound.tick && remaining !== lastTickWhole && remaining > 0) playTick(remaining);
+    lastTickWhole = remaining;
     timer.remaining = remaining;
     renderTimerDisplay();
     if (remaining <= 0){
@@ -297,9 +333,11 @@
     timer.running = true;
     timer.paused = false;
     timer.endTime = Date.now() + timer.remaining * 1000;
+    lastTickWhole = timer.remaining;
     clearInterval(timer.intervalId);
     timer.intervalId = setInterval(tickTimer, 250);
     AsciiLayer.setState("running");
+    if (settings.sound.playPause) playClick(true);
     renderControlsUI();
   }
 
@@ -308,6 +346,7 @@
     timer.paused = true;
     clearInterval(timer.intervalId);
     AsciiLayer.setState("paused");
+    if (settings.sound.playPause) playClick(false);
     renderControlsUI();
   }
 
@@ -331,16 +370,164 @@
     renderTimerDisplay();
     renderControlsUI();
     AsciiLayer.setState("completed");
-    playChime();
+    if (settings.sound.completion) playChime();
     el.timer.classList.remove("state-completed");
     // eslint-disable-next-line no-unused-expressions
     void el.timer.offsetWidth; // restart animation
     el.timer.classList.add("state-completed");
+
+    if (settings.timerFormat === "pomodoro"){
+      let nextMode;
+      if (timer.mode === "focus"){
+        timer.pomodoroCount++;
+        nextMode = (timer.pomodoroCount % 4 === 0) ? "long" : "short";
+      } else {
+        nextMode = "focus";
+        if (timer.mode === "long") timer.pomodoroCount = 0;
+      }
+      renderPomodoroDots();
+      resetTimerForMode(nextMode);
+    }
   }
 
   function onVisibilityChange(){
     if (document.visibilityState === "visible" && timer.running){
       tickTimer();
+    }
+  }
+
+  /* ---------- stopwatch ("contador") ---------- */
+  let lastStopwatchTick = null;
+  function tickStopwatch(){
+    if (!stopwatch.running) return;
+    const elapsed = stopwatch.accumulated + Math.floor((Date.now() - stopwatch.startTs) / 1000);
+    if (settings.sound.tick && elapsed !== lastStopwatchTick) playTick(elapsed);
+    lastStopwatchTick = elapsed;
+    renderStopwatchDisplay(elapsed);
+  }
+
+  function startStopwatch(){
+    stopwatch.running = true;
+    stopwatch.startTs = Date.now();
+    clearInterval(stopwatch.intervalId);
+    stopwatch.intervalId = setInterval(tickStopwatch, 250);
+    AsciiLayer.setState("running");
+    if (settings.sound.playPause) playClick(true);
+    renderControlsUI();
+  }
+
+  function pauseStopwatch(){
+    stopwatch.running = false;
+    stopwatch.accumulated += Math.floor((Date.now() - stopwatch.startTs) / 1000);
+    clearInterval(stopwatch.intervalId);
+    AsciiLayer.setState("paused");
+    if (settings.sound.playPause) playClick(false);
+    renderControlsUI();
+  }
+
+  function resetStopwatch(){
+    clearInterval(stopwatch.intervalId);
+    stopwatch.running = false;
+    stopwatch.accumulated = 0;
+    stopwatch.startTs = null;
+    AsciiLayer.setState("idle");
+    renderStopwatchDisplay(0);
+    renderControlsUI();
+  }
+
+  function renderStopwatchDisplay(elapsedSeconds){
+    el.timer.textContent = formatTime(elapsedSeconds);
+  }
+
+  /* ---------- clock ("relógio") ---------- */
+  function tickClock(){
+    const now = new Date();
+    el.timer.textContent = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}:${String(now.getSeconds()).padStart(2,"0")}`;
+  }
+  function startClock(){
+    tickClock();
+    clearInterval(clockIntervalId);
+    clockIntervalId = setInterval(tickClock, 1000);
+  }
+  function stopClock(){
+    clearInterval(clockIntervalId);
+    clockIntervalId = null;
+  }
+
+  /* ---------- format orchestration ---------- */
+  function onStartPauseClick(){
+    const format = settings.timerFormat;
+    if (format === "relogio") return;
+    if (format === "contador"){
+      if (stopwatch.running) pauseStopwatch(); else startStopwatch();
+    } else {
+      if (timer.running) pauseTimer(); else startTimer();
+    }
+  }
+
+  function onResetClick(){
+    if (settings.timerFormat === "contador") resetStopwatch();
+    else resetTimer();
+  }
+
+  function stopAllEngines(){
+    clearInterval(timer.intervalId); timer.intervalId = null;
+    timer.running = false; timer.paused = false; timer.endTime = null;
+    clearInterval(stopwatch.intervalId); stopwatch.intervalId = null;
+    stopwatch.running = false; stopwatch.accumulated = 0; stopwatch.startTs = null;
+    stopClock();
+  }
+
+  function applyFormatUI(){
+    const format = settings.timerFormat;
+    const isCountdownFormat = format === "cronometro" || format === "pomodoro";
+    el.modeRow.hidden = !isCountdownFormat;
+    el.durationsSection.hidden = !isCountdownFormat;
+    el.pomodoroDots.hidden = format !== "pomodoro";
+    el.startBtn.hidden = format === "relogio";
+    el.resetBtn.hidden = format === "relogio";
+  }
+
+  function activateFormat(){
+    const format = settings.timerFormat;
+    if (format === "relogio"){
+      startClock();
+      el.sessionHint.textContent = I18N.t("hintClock");
+    } else if (format === "contador"){
+      renderStopwatchDisplay(0);
+      renderControlsUI();
+      el.sessionHint.textContent = I18N.t("hintStopwatch");
+    } else {
+      timer.remaining = durationSeconds(timer.mode);
+      if (format === "pomodoro") timer.pomodoroCount = 0;
+      renderTimerDisplay();
+      renderModeUI();
+      renderControlsUI();
+      renderPomodoroDots();
+    }
+  }
+
+  function setTimerFormat(format){
+    if (settings.timerFormat === format) return;
+    settings.timerFormat = format;
+    saveSettings();
+    stopAllEngines();
+    AsciiLayer.setState("idle");
+    applyFormatUI();
+    renderFormatTabsUI();
+    activateFormat();
+  }
+
+  function renderFormatTabsUI(){
+    el.formatTabs.forEach(tab => tab.classList.toggle("active", tab.dataset.format === settings.timerFormat));
+  }
+
+  function renderPomodoroDots(){
+    el.pomodoroDots.innerHTML = "";
+    for (let i = 0; i < 4; i++){
+      const dot = document.createElement("span");
+      dot.className = "pomodoro-dot" + (i < timer.pomodoroCount ? " filled" : "");
+      el.pomodoroDots.appendChild(dot);
     }
   }
 
@@ -366,6 +553,42 @@
     } catch(e){ /* audio unavailable — fail silently */ }
   }
 
+  function playClick(rising){
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      const f0 = rising ? 520 : 660;
+      const f1 = rising ? 760 : 420;
+      osc.frequency.setValueAtTime(f0, now);
+      osc.frequency.exponentialRampToValueAtTime(f1, now + 0.09);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.13, now + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.15);
+    } catch(e){ /* audio unavailable — fail silently */ }
+  }
+
+  function playTick(n){
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "square";
+      osc.frequency.value = (n % 2 === 0) ? 1500 : 1150; // alternates like a real tick / tock
+      gain.gain.setValueAtTime(0.045, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.02);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.025);
+    } catch(e){ /* audio unavailable — fail silently */ }
+  }
+
   /* ============================================================
      RENDER
      ============================================================ */
@@ -380,7 +603,14 @@
   }
 
   function renderModeUI(){
-    el.sessionHint.textContent = MODE_HINTS[timer.mode];
+    if (settings.timerFormat === "relogio"){
+      el.sessionHint.textContent = I18N.t("hintClock");
+    } else if (settings.timerFormat === "contador"){
+      el.sessionHint.textContent = I18N.t("hintStopwatch");
+    } else {
+      const hintKey = timer.mode === "focus" ? "hintFocus" : timer.mode === "short" ? "hintShort" : "hintLong";
+      el.sessionHint.textContent = I18N.t(hintKey);
+    }
     el.modePills.forEach(pill => {
       pill.classList.toggle("active", pill.dataset.mode === timer.mode);
     });
@@ -390,13 +620,21 @@
     const playIcon = el.startBtn.querySelector(".icon-play");
     const pauseIcon = el.startBtn.querySelector(".icon-pause");
     const label = el.startBtn.querySelector(".btn-label");
-    if (timer.running){
+    let running, paused;
+    if (settings.timerFormat === "contador"){
+      running = stopwatch.running;
+      paused = !stopwatch.running && stopwatch.accumulated > 0;
+    } else {
+      running = timer.running;
+      paused = timer.paused;
+    }
+    if (running){
       playIcon.hidden = true; pauseIcon.hidden = false;
-      label.textContent = "Pause";
+      label.textContent = I18N.t("pauseLabel");
       el.startBtn.classList.add("running");
     } else {
       playIcon.hidden = false; pauseIcon.hidden = true;
-      label.textContent = timer.paused ? "Resume" : "Start";
+      label.textContent = paused ? I18N.t("resumeLabel") : I18N.t("startLabel");
       el.startBtn.classList.remove("running");
     }
   }
@@ -437,6 +675,21 @@
       updateAdaptiveForeground(preset.avg);
       updateDitherDuotone(preset.avg);
       updateAccentFromAvg(preset.avg);
+    } else if (bg.type === "gallery" && bg.wallpaperId){
+      el.bgLayer.classList.add("has-image");
+      const src = `wallpapers/${bg.wallpaperId}.png`;
+      el.bgLayer.style.backgroundImage = `url("${src}")`;
+      const img = new Image();
+      img.onload = () => {
+        AsciiLayer.setSourceImage(img);
+        DitherLayer.setSourceImage(img);
+        const { avg, vividHue, vividSat } = analyzeImageColors(img);
+        updateAdaptiveForeground(avg);
+        updateDitherDuotone(avg);
+        updateAccentColor(vividHue, vividSat);
+      };
+      img.src = src;
+      currentImageEl = img;
     } else if (bg.type === "image" && bg.image){
       el.bgLayer.classList.add("has-image");
       el.bgLayer.style.setProperty("--user-bg-image", `url(${CSS.escape ? bg.image : bg.image})`);
@@ -501,6 +754,47 @@
   }
 
   /* ============================================================
+     GALLERY
+     ============================================================ */
+  function buildGalleryGrid(){
+    el.galleryGrid.innerHTML = "";
+    WALLPAPERS.forEach(wp => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "gallery-thumb";
+      btn.style.backgroundImage = `url("wallpapers/${wp.id}-thumb.png")`;
+      btn.dataset.wallpaperId = wp.id;
+      btn.setAttribute("aria-label", wp.label);
+      btn.innerHTML = `<span class="gallery-thumb-label">${wp.label}</span><span class="gallery-thumb-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>`;
+      btn.addEventListener("click", () => {
+        settings.background = { ...settings.background, type: "gallery", wallpaperId: wp.id, image: null };
+        saveSettings();
+        applyBackground();
+        renderGalleryUI();
+        renderSettingsBackgroundUI();
+      });
+      el.galleryGrid.appendChild(btn);
+    });
+  }
+
+  function renderGalleryUI(){
+    Array.from(el.galleryGrid.children).forEach(btn => {
+      btn.classList.toggle("active", settings.background.type === "gallery" && settings.background.wallpaperId === btn.dataset.wallpaperId);
+    });
+  }
+
+  function openGallery(){
+    el.galleryOverlay.hidden = false;
+    renderGalleryUI();
+    el.closeGallery.focus();
+  }
+
+  function closeGalleryPanel(){
+    el.galleryOverlay.hidden = true;
+    el.galleryBtn.focus();
+  }
+
+  /* ============================================================
      SETTINGS PANEL
      ============================================================ */
   function openSettings(){
@@ -509,9 +803,14 @@
     el.durShort.value = settings.durations.short;
     el.durLong.value = settings.durations.long;
     el.asciiToggle.checked = settings.asciiEnabled;
+    el.soundPlayPauseToggle.checked = settings.sound.playPause;
+    el.soundTickToggle.checked = settings.sound.tick;
+    el.soundCompletionToggle.checked = settings.sound.completion;
     renderSettingsBackgroundUI();
     renderWeightTabsUI();
     renderDitherUI();
+    renderFormatTabsUI();
+    renderLangTabsUI();
     el.closeSettings.focus();
   }
 
@@ -550,7 +849,7 @@
     const fs = isFullscreen();
     enterIcon.hidden = fs;
     exitIcon.hidden = !fs;
-    el.fullscreenBtn.setAttribute("aria-label", fs ? "Sair da tela cheia" : "Entrar em tela cheia");
+    el.fullscreenBtn.setAttribute("aria-label", fs ? I18N.t("fullscreenExitAria") : I18N.t("fullscreenEnterAria"));
   }
 
   function toggleFullscreen(){
@@ -566,8 +865,29 @@
      ============================================================ */
   function renderDateBadge(){
     const now = new Date();
-    const month = MONTHS_PT[now.getMonth()];
-    el.dateDisplay.textContent = `${month} ${now.getDate()} de ${now.getFullYear()}`;
+    const months = I18N.t("months");
+    const month = months[now.getMonth()];
+    const connector = I18N.t("dateConnector");
+    el.dateDisplay.textContent = `${month} ${now.getDate()} ${connector} ${now.getFullYear()}`;
+  }
+
+  /* ============================================================
+     LANGUAGE
+     ============================================================ */
+  function setLocale(locale){
+    settings.locale = locale;
+    saveSettings();
+    I18N.setLocale(locale);
+    I18N.apply();
+    renderLangTabsUI();
+    renderModeUI();
+    renderControlsUI();
+    updateFullscreenIcon();
+    renderDateBadge();
+  }
+
+  function renderLangTabsUI(){
+    el.langTabs.forEach(tab => tab.classList.toggle("active", tab.dataset.lang === settings.locale));
   }
 
   /* ============================================================
@@ -631,11 +951,8 @@
      EVENTS
      ============================================================ */
   function wireEvents(){
-    el.startBtn.addEventListener("click", () => {
-      if (timer.running) pauseTimer();
-      else startTimer();
-    });
-    el.resetBtn.addEventListener("click", resetTimer);
+    el.startBtn.addEventListener("click", onStartPauseClick);
+    el.resetBtn.addEventListener("click", onResetClick);
     el.fullscreenBtn.addEventListener("click", toggleFullscreen);
     document.addEventListener("fullscreenchange", updateFullscreenIcon);
 
@@ -653,13 +970,45 @@
     el.settingsOverlay.addEventListener("click", (e) => {
       if (e.target === el.settingsOverlay) closeSettingsPanel();
     });
+
+    el.galleryBtn.addEventListener("click", openGallery);
+    el.closeGallery.addEventListener("click", closeGalleryPanel);
+    el.galleryOverlay.addEventListener("click", (e) => {
+      if (e.target === el.galleryOverlay) closeGalleryPanel();
+    });
+
+    el.formatTabs.forEach(tab => {
+      tab.addEventListener("click", () => setTimerFormat(tab.dataset.format));
+    });
+
+    el.soundPlayPauseToggle.addEventListener("change", () => {
+      settings.sound.playPause = el.soundPlayPauseToggle.checked;
+      saveSettings();
+    });
+    el.soundTickToggle.addEventListener("change", () => {
+      settings.sound.tick = el.soundTickToggle.checked;
+      saveSettings();
+    });
+    el.soundCompletionToggle.addEventListener("change", () => {
+      settings.sound.completion = el.soundCompletionToggle.checked;
+      saveSettings();
+    });
+
+    el.langTabs.forEach(tab => {
+      tab.addEventListener("click", () => setLocale(tab.dataset.lang));
+    });
+
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !el.settingsOverlay.hidden) closeSettingsPanel();
+      if (e.key === "Escape"){
+        if (!el.settingsOverlay.hidden) closeSettingsPanel();
+        if (!el.galleryOverlay.hidden) closeGalleryPanel();
+      }
       const active = document.activeElement;
       const isTyping = active && (active.tagName === "BUTTON" || active.tagName === "INPUT" || active.isContentEditable);
-      if (e.code === "Space" && el.settingsOverlay.hidden && !isTyping){
+      const anyOverlayOpen = !el.settingsOverlay.hidden || !el.galleryOverlay.hidden;
+      if (e.code === "Space" && !anyOverlayOpen && !isTyping){
         e.preventDefault();
-        if (timer.running) pauseTimer(); else startTimer();
+        onStartPauseClick();
       }
     });
 
@@ -694,10 +1043,11 @@
     });
 
     el.resetBgBtn.addEventListener("click", () => {
-      settings.background = { type: "default", color: "#16233c", gradientId: "aurora", image: null };
+      settings.background = { type: "default", color: "#16233c", gradientId: "aurora", wallpaperId: null, image: null };
       saveSettings();
       applyBackground();
       renderSettingsBackgroundUI();
+      renderGalleryUI();
     });
 
     el.asciiToggle.addEventListener("change", () => {
@@ -748,17 +1098,20 @@
      ============================================================ */
   function init(){
     loadSettings();
+    I18N.setLocale(settings.locale);
     buildGradientPresetSwatches();
+    buildGalleryGrid();
     wireEvents();
+    I18N.apply();
 
-    timer.remaining = durationSeconds(timer.mode);
-    renderTimerDisplay();
-    renderModeUI();
-    renderControlsUI();
+    applyFontWeight();
     renderDateBadge();
     initTaskInput();
     updateFullscreenIcon();
-    applyFontWeight();
+
+    applyFormatUI();
+    renderFormatTabsUI();
+    activateFormat();
 
     applyBackground();
     AsciiLayer.init(el.asciiCanvas);

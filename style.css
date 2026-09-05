@@ -168,6 +168,11 @@ label.file-drop:focus-within{
   color:var(--color-fg);
   transition:color var(--dur-med) var(--ease-out);
 }
+.header-actions{
+  display:flex;
+  align-items:center;
+  gap:var(--space-2);
+}
 
 /* ============================================================
    BUTTONS / GLASS PRIMITIVES
@@ -332,17 +337,17 @@ label.file-drop:focus-within{
 }
 
 /* ============================================================
-   SETTINGS OVERLAY
+   SETTINGS / GALLERY OVERLAYS
    ============================================================ */
-#settings-overlay[hidden]{
+#settings-overlay[hidden], #gallery-overlay[hidden]{
   display:none !important;
 }
-#settings-overlay{
-  /* The settings panel always sits on its own dark, blurred glass
+#settings-overlay, #gallery-overlay{
+  /* These panels always sit on their own dark, blurred glass
      surface — independent of the page's adaptive background colors.
-     Pinning fixed tokens here prevents the panel from inheriting a
+     Pinning fixed tokens here prevents them from inheriting a
      dark adaptive --color-fg (meant for light page backgrounds) and
-     becoming unreadable against its own dark glass. */
+     becoming unreadable against their own dark glass. */
   --color-fg: #f4f2ec;
   --color-fg-ink: #14100c;
   --color-fg-muted: color-mix(in srgb, var(--color-fg) 58%, transparent);
@@ -523,7 +528,7 @@ label.file-drop:focus-within{
 .switch input:checked + .switch-track{ background:var(--color-primary); }
 .switch input:checked + .switch-track .switch-thumb{ transform:translateX(16px); background:var(--color-primary-ink); }
 
-.weight-tab{
+.weight-tab, .format-tab, .lang-tab{
   padding:var(--space-2) var(--space-3);
   border-radius:var(--radius-pill);
   font-size:12.5px;
@@ -532,8 +537,8 @@ label.file-drop:focus-within{
   border:1px solid var(--glass-border);
   transition:all var(--dur-fast) var(--ease-out);
 }
-.weight-tab:hover{ color:var(--color-fg-muted); }
-.weight-tab.active{
+.weight-tab:hover, .format-tab:hover, .lang-tab:hover{ color:var(--color-fg-muted); }
+.weight-tab.active, .format-tab.active, .lang-tab.active{
   color:var(--color-fg);
   background:var(--glass-bg-strong);
 }
@@ -582,6 +587,79 @@ input[type="range"]::-moz-range-track{
   height:4px;
   border-radius:var(--radius-pill);
   background:var(--glass-bg-strong);
+}
+
+/* ============================================================
+   GALLERY
+   ============================================================ */
+.gallery-hint{
+  font-size:13px;
+  color:var(--color-fg-muted);
+  margin-bottom:var(--space-4);
+}
+.gallery-grid{
+  display:grid;
+  grid-template-columns:repeat(2, 1fr);
+  gap:var(--space-3);
+}
+.gallery-thumb{
+  position:relative;
+  aspect-ratio:16/10;
+  border-radius:var(--radius-m);
+  overflow:hidden;
+  border:2px solid transparent;
+  cursor:pointer;
+  background-size:cover;
+  background-position:center;
+  transition:transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+.gallery-thumb:hover{ transform:scale(1.02); }
+.gallery-thumb.active{ border-color:var(--color-primary); }
+.gallery-thumb-label{
+  position:absolute;
+  left:var(--space-2);
+  bottom:var(--space-2);
+  font-size:11px;
+  font-weight:600;
+  color:#f4f2ec;
+  text-shadow:0 1px 4px rgba(0,0,0,.6);
+}
+.gallery-thumb-check{
+  position:absolute;
+  top:var(--space-2);
+  right:var(--space-2);
+  width:20px; height:20px;
+  border-radius:50%;
+  background:var(--color-primary);
+  color:var(--color-primary-ink);
+  display:flex; align-items:center; justify-content:center;
+  opacity:0;
+  transform:scale(.6);
+  transition:all var(--dur-fast) var(--ease-out);
+}
+.gallery-thumb.active .gallery-thumb-check{ opacity:1; transform:scale(1); }
+
+/* ============================================================
+   POMODORO SESSION DOTS
+   ============================================================ */
+.pomodoro-dots{
+  display:flex;
+  gap:var(--space-2);
+}
+.pomodoro-dots[hidden]{ display:none; }
+.pomodoro-dot{
+  width:7px; height:7px;
+  border-radius:50%;
+  background:var(--color-fg-border);
+  transition:background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.pomodoro-dot.filled{
+  background:var(--color-fg);
+  transform:scale(1.15);
+}
+.pomodoro-dot.current{
+  background:var(--color-primary);
+  transform:scale(1.3);
 }
 
 /* ============================================================
